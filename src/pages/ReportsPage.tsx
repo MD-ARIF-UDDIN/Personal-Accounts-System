@@ -18,6 +18,10 @@ interface ReportsPageProps {
   dealers: Dealer[];
   transactions: Transaction[];
   payments: Payment[];
+  onEditTransaction?: (tx: Transaction) => void;
+  onDeleteTransaction?: (id: string) => void;
+  onEditPayment?: (payment: Payment) => void;
+  onDeletePayment?: (id: string) => void;
 }
 
 type ReportTab = 'dealers' | 'daily' | 'monthly';
@@ -26,6 +30,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   dealers,
   transactions,
   payments,
+  onEditTransaction,
+  onDeleteTransaction,
+  onEditPayment,
+  onDeletePayment,
 }) => {
   const [activeTab, setActiveTab] = useState<ReportTab>('dealers');
 
@@ -367,7 +375,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                         item.transactions.map((tx) => (
                           <div
                             key={tx.id}
-                            className="p-2 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-mono"
+                            className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-mono"
                           >
                             <div>
                               <span className="text-slate-600 font-sans block">
@@ -379,7 +387,33 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-slate-900">{formatCurrency(tx.amount)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">{formatCurrency(tx.amount)}</span>
+                              {(onEditTransaction || onDeleteTransaction) && (
+                                <div className="flex items-center gap-1 font-sans">
+                                  {onEditTransaction && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onEditTransaction(tx)}
+                                      className="px-2 py-0.5 text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 rounded-lg transition"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {onDeleteTransaction && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm('Delete this transaction?')) onDeleteTransaction(tx.id);
+                                      }}
+                                      className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 rounded-lg transition"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}
@@ -393,7 +427,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                         item.payments.map((p) => (
                           <div
                             key={p.id}
-                            className="p-2 bg-emerald-50/60 rounded-xl flex items-center justify-between text-xs font-mono"
+                            className="p-2.5 bg-emerald-50/60 rounded-xl flex items-center justify-between text-xs font-mono"
                           >
                             <div>
                               <span className="text-emerald-800 font-sans block">
@@ -405,7 +439,33 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
+                              {(onEditPayment || onDeletePayment) && (
+                                <div className="flex items-center gap-1 font-sans">
+                                  {onEditPayment && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onEditPayment(p)}
+                                      className="px-2 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {onDeletePayment && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm('Delete this payment record?')) onDeletePayment(p.id);
+                                      }}
+                                      className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 rounded-lg transition"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}

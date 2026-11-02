@@ -408,6 +408,16 @@ export function App() {
                   setDefaultPaymentDealerId(dealerId);
                   setIsPaymentModalOpen(true);
                 }}
+                onEditTransaction={(tx) => {
+                  setTxToEdit(tx);
+                  setIsTxModalOpen(true);
+                }}
+                onDeleteTransaction={handleDeleteTransaction}
+                onEditPayment={(p) => {
+                  setPaymentToEdit(p);
+                  setIsPaymentModalOpen(true);
+                }}
+                onDeletePayment={handleDeletePayment}
               />
             )}
 
@@ -450,6 +460,16 @@ export function App() {
                 dealers={dealers}
                 transactions={transactions}
                 payments={payments}
+                onEditTransaction={(tx) => {
+                  setTxToEdit(tx);
+                  setIsTxModalOpen(true);
+                }}
+                onDeleteTransaction={handleDeleteTransaction}
+                onEditPayment={(p) => {
+                  setPaymentToEdit(p);
+                  setIsPaymentModalOpen(true);
+                }}
+                onDeletePayment={handleDeletePayment}
               />
             )}
 

@@ -118,61 +118,75 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
       </div>
 
       {/* Payments List */}
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
             No payments found.
           </div>
         ) : (
           filtered.map((p) => (
             <div
               key={p.id}
-              className="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs flex items-center justify-between gap-3"
+              className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-2.5"
             >
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm leading-tight">
-                  {p.dealer?.name || 'Dealer'}
-                </h4>
-                <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
-                  <span>{formatDate(p.date)}</span>
-                  <span className="bg-emerald-50 text-emerald-800 font-semibold px-1 rounded text-[10px]">
-                    {p.payment_method || 'Wallet'}
-                  </span>
-                  {p.reference_no && (
-                    <span className="bg-slate-100 px-1 rounded text-slate-700">
-                      {p.reference_no}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-base leading-tight">
+                    {p.dealer?.name || 'Dealer'}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-500 font-mono">
+                    <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg">
+                      {formatDate(p.date)}
                     </span>
-                  )}
+                    <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">
+                      {p.payment_method || 'Wallet'}
+                    </span>
+                    {p.reference_no && (
+                      <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded-lg">
+                        Ref: {p.reference_no}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {p.notes && (
-                  <p className="text-[11px] text-slate-500 italic mt-1 bg-slate-50 px-2 py-0.5 rounded">
-                    Note: {p.notes}
-                  </p>
-                )}
+
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider block">
+                    Paid Amount
+                  </span>
+                  <span className="font-mono font-extrabold text-base sm:text-lg text-emerald-700">
+                    +{formatCurrency(p.amount)}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono font-extrabold text-base text-emerald-700">
-                  +{formatCurrency(p.amount)}
-                </span>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => onEditPayment(p)}
-                    className="p-1.5 text-slate-400 hover:text-emerald-600 transition"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Delete payment record?')) {
-                        onDeletePayment(p.id);
-                      }
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              {p.notes && (
+                <p className="text-xs text-slate-600 italic bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                  Note: {p.notes}
+                </p>
+              )}
+
+              {/* Action Buttons: Edit and Delete */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => onEditPayment(p)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition active:scale-95"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Delete payment of ${formatCurrency(p.amount)} from "${p.dealer?.name || 'Dealer'}"?`)) {
+                      onDeletePayment(p.id);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
               </div>
             </div>
           ))

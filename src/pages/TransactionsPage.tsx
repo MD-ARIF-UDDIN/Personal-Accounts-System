@@ -118,58 +118,72 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
       </div>
 
       {/* Transactions List */}
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
             No transactions found.
           </div>
         ) : (
           filtered.map((tx) => (
             <div
               key={tx.id}
-              className="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs flex items-center justify-between gap-3"
+              className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-2.5"
             >
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm leading-tight">
-                  {tx.dealer?.name || 'Dealer'}
-                </h4>
-                <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
-                  <span>{formatDate(tx.date)}</span>
-                  {tx.reference_no && (
-                    <span className="bg-slate-100 px-1 rounded text-slate-700">
-                      {tx.reference_no}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-base leading-tight">
+                    {tx.dealer?.name || 'Dealer'}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-500 font-mono">
+                    <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg">
+                      {formatDate(tx.date)}
                     </span>
-                  )}
+                    {tx.reference_no && (
+                      <span className="bg-sky-50 text-sky-800 font-semibold px-2 py-0.5 rounded-lg">
+                        Ref: {tx.reference_no}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {(tx.notes || tx.description) && (
-                  <p className="text-[11px] text-slate-500 italic mt-1 bg-slate-50 px-2 py-0.5 rounded">
-                    Note: {tx.notes || tx.description}
-                  </p>
-                )}
+
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider block">
+                    Amount
+                  </span>
+                  <span className="font-mono font-extrabold text-base sm:text-lg text-slate-900">
+                    {formatCurrency(tx.amount)}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono font-extrabold text-base text-slate-900">
-                  {formatCurrency(tx.amount)}
-                </span>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => onEditTransaction(tx)}
-                    className="p-1.5 text-slate-400 hover:text-sky-600 transition"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Delete transaction?')) {
-                        onDeleteTransaction(tx.id);
-                      }
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              {(tx.notes || tx.description) && (
+                <p className="text-xs text-slate-600 italic bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                  Note: {tx.notes || tx.description}
+                </p>
+              )}
+
+              {/* Action Buttons: Edit and Delete */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => onEditTransaction(tx)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl transition active:scale-95"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Delete transaction of ${formatCurrency(tx.amount)} for "${tx.dealer?.name || 'Dealer'}"?`)) {
+                      onDeleteTransaction(tx.id);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
               </div>
             </div>
           ))
