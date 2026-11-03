@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, 
-  Users, 
+  Wallet, 
   ArrowLeftRight, 
   CreditCard, 
   FileSpreadsheet,
@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'dealers' as NavTab, label: 'Dealers', icon: Users },
+    { id: 'dealers' as NavTab, label: 'Wallets', icon: Wallet },
     { id: 'transactions' as NavTab, label: 'Transactions', icon: ArrowLeftRight },
     { id: 'payments' as NavTab, label: 'Payments', icon: CreditCard },
     { id: 'reports' as NavTab, label: 'Reports', icon: FileSpreadsheet },

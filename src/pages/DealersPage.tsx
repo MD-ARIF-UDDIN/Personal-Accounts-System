@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  ArrowLeftRight, 
+import {
+  Users,
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  ArrowLeftRight,
   CreditCard,
   FileText,
   Copy,
@@ -81,9 +81,8 @@ export const DealersPage: React.FC<DealersPageProps> = ({
     if (!query) return dealers;
     return dealers.filter(
       (d) =>
-        d.name.toLowerCase().includes(query) ||
-        d.dealer_number.toLowerCase().includes(query) ||
-        d.wallet_number.toLowerCase().includes(query)
+        d.wallet_number.toLowerCase().includes(query) ||
+        (d.notes && d.notes.toLowerCase().includes(query))
     );
   }, [dealers, searchTerm]);
 
@@ -92,14 +91,14 @@ export const DealersPage: React.FC<DealersPageProps> = ({
       {/* Top Header & Add Button */}
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-extrabold text-slate-900">
-          Dealers ({dealers.length})
+          Wallets ({dealers.length})
         </h2>
         <button
           onClick={onAddDealer}
           className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition active:scale-95"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Add Dealer</span>
+          <span>+ Add Wallet</span>
         </button>
       </div>
 
@@ -108,7 +107,7 @@ export const DealersPage: React.FC<DealersPageProps> = ({
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
         <input
           type="text"
-          placeholder="Search name, dealer #, wallet #..."
+          placeholder="Search wallet number or note..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-8 py-3 text-sm border-2 border-slate-200 rounded-2xl bg-white focus:outline-none focus:border-sky-500 shadow-2xs font-medium"
@@ -123,59 +122,50 @@ export const DealersPage: React.FC<DealersPageProps> = ({
         )}
       </div>
 
-      {/* Dealers Mobile Cards List */}
+      {/* Wallets Mobile Cards List */}
       <div className="space-y-3">
         {filteredDealers.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-medium">
-            No dealers found.
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
+            No wallets found.
           </div>
         ) : (
           filteredDealers.map((dealer) => {
             const info = dealerBalances.get(dealer.id) || { totalTx: 0, totalPay: 0, balance: 0 };
-            const isDue = info.balance > 0;
 
             return (
               <div
                 key={dealer.id}
                 className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-3"
               >
-                {/* Header: Name and Due Balance */}
+                {/* Header: Wallet Number & Copy */}
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-extrabold text-base text-slate-900 leading-tight">
-                      {dealer.name}
-                    </h3>
-                    <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs font-mono">
-                      {/* Tap to copy Dealer # */}
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(dealer.dealer_number, `dlr-${dealer.id}`)}
-                        className="bg-sky-50 text-sky-800 font-bold px-2 py-1 rounded-xl flex items-center gap-1 active:scale-95 transition"
-                        title="Tap to copy dealer number"
-                      >
-                        <span>No: {dealer.dealer_number}</span>
-                        {copiedKey === `dlr-${dealer.id}` ? (
-                          <Check className="w-3 h-3 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3 h-3 opacity-60" />
-                        )}
-                      </button>
-
-                      {/* Tap to copy Wallet # */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs uppercase font-extrabold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-lg">
+                        Wallet
+                      </span>
+                      <h3 className="font-extrabold text-lg font-mono text-slate-900 leading-tight">
+                        {dealer.wallet_number}
+                      </h3>
                       <button
                         type="button"
                         onClick={() => copyToClipboard(dealer.wallet_number, `wlt-${dealer.id}`)}
-                        className="bg-emerald-50 text-emerald-800 font-bold px-2 py-1 rounded-xl flex items-center gap-1 active:scale-95 transition"
-                        title="Tap to copy wallet number"
+                        className="text-slate-400 hover:text-slate-600 p-1 rounded-lg active:scale-95 transition"
+                        title="Copy wallet number"
                       >
-                        <span>Wlt: {dealer.wallet_number}</span>
                         {copiedKey === `wlt-${dealer.id}` ? (
-                          <Check className="w-3 h-3 text-emerald-600" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
-                          <Copy className="w-3 h-3 opacity-60" />
+                          <Copy className="w-3.5 h-3.5" />
                         )}
                       </button>
                     </div>
+
+                    {dealer.notes && (
+                      <p className="text-xs text-slate-600 italic mt-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100 inline-block">
+                        Note: {dealer.notes}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -190,12 +180,6 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                     <span className="font-extrabold text-emerald-700">{formatCurrency(info.totalPay)}</span>
                   </div>
                 </div>
-
-                {dealer.notes && (
-                  <p className="text-xs text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 italic">
-                    Note: {dealer.notes}
-                  </p>
-                )}
 
                 {/* Dealer Actions */}
                 <div className="space-y-2 pt-1 border-t border-slate-100">
@@ -240,7 +224,7 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`Delete dealer "${dealer.name}" (${dealer.dealer_number})? All their transactions and payments will also be deleted.`)) {
+                        if (window.confirm(`Delete wallet "${dealer.wallet_number}"? All its transactions and payments will also be deleted.`)) {
                           onDeleteDealer(dealer.id);
                         }
                       }}
@@ -267,12 +251,17 @@ export const DealersPage: React.FC<DealersPageProps> = ({
 
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-extrabold text-slate-900 text-base">
-                  {selectedDealerForLedger.name}
+                <span className="text-[10px] uppercase font-extrabold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-lg">
+                  Wallet Statement
+                </span>
+                <h3 className="font-extrabold text-slate-900 text-lg font-mono mt-0.5">
+                  {selectedDealerForLedger.wallet_number}
                 </h3>
-                <p className="text-xs text-slate-500 font-mono">
-                  No: {selectedDealerForLedger.dealer_number} • Wlt: {selectedDealerForLedger.wallet_number}
-                </p>
+                {selectedDealerForLedger.notes && (
+                  <p className="text-xs text-slate-500 italic mt-0.5">
+                    Note: {selectedDealerForLedger.notes}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setSelectedDealerForLedger(null)}
@@ -291,7 +280,6 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                     date: t.date,
                     type: 'TX' as const,
                     amount: Number(t.amount || 0),
-                    ref: t.reference_no,
                     notes: t.notes || t.description,
                     raw: t,
                   }));
@@ -303,7 +291,6 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                     date: p.date,
                     type: 'PAY' as const,
                     amount: Number(p.amount || 0),
-                    ref: p.reference_no,
                     notes: p.notes,
                     raw: p,
                   }));
@@ -314,8 +301,8 @@ export const DealersPage: React.FC<DealersPageProps> = ({
 
                 if (history.length === 0) {
                   return (
-                    <p className="text-xs text-slate-400 text-center py-8">
-                      No transactions or payments for this dealer yet.
+                    <p className="text-xs text-slate-400 text-center py-8 font-medium">
+                      No transactions or payments for this wallet yet.
                     </p>
                   );
                 }
@@ -329,15 +316,13 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                       <div>
                         <div className="flex items-center gap-1.5 font-bold">
                           <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded ${
-                              item.type === 'TX'
+                            className={`text-[10px] px-1.5 py-0.5 rounded ${item.type === 'TX'
                                 ? 'bg-sky-100 text-sky-800'
                                 : 'bg-emerald-100 text-emerald-800'
-                            }`}
+                              }`}
                           >
                             {item.type === 'TX' ? 'Transaction' : 'Payment'}
                           </span>
-                          {item.ref && <span className="font-mono text-slate-500">[{item.ref}]</span>}
                         </div>
                         <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
                           {formatDate(item.date)}
@@ -350,9 +335,8 @@ export const DealersPage: React.FC<DealersPageProps> = ({
                       </div>
 
                       <span
-                        className={`font-mono font-extrabold text-sm ${
-                          item.type === 'TX' ? 'text-slate-900' : 'text-emerald-700'
-                        }`}
+                        className={`font-mono font-extrabold text-sm ${item.type === 'TX' ? 'text-slate-900' : 'text-emerald-700'
+                          }`}
                       >
                         {item.type === 'TX' ? '' : '+'}
                         {formatCurrency(item.amount)}

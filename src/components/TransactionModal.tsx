@@ -22,7 +22,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [dealerId, setDealerId] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [date, setDate] = useState<string>('');
-  const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +38,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDealerId(txToEdit.dealer_id || '');
       setAmount(txToEdit.amount?.toString() || '');
       setDate(txToEdit.date || getTodayStr());
-      setReferenceNo(txToEdit.reference_no || '');
       setNotes(txToEdit.notes || txToEdit.description || '');
     } else {
       setDealerId(defaultDealerId || (dealers.length > 0 ? dealers[0].id : ''));
       setAmount('');
       setDate(getTodayStr());
-      setReferenceNo('');
       setNotes('');
     }
     setError(null);
@@ -56,7 +53,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dealerId) {
-      setError('Please select a dealer.');
+      setError('Please select a wallet.');
       return;
     }
     const numAmount = parseFloat(amount);
@@ -72,7 +69,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         dealer_id: dealerId,
         amount: numAmount,
         date: date || getTodayStr(),
-        reference_no: referenceNo.trim() || undefined,
         notes: notes.trim() || undefined,
       });
       onClose();
@@ -98,9 +94,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <h3 className="font-extrabold text-slate-900 text-base">
             {txToEdit ? 'Edit Transaction' : 'Record Transaction'}
           </h3>
-          <button 
+          <button
             type="button"
-            onClick={onClose} 
+            onClick={onClose}
             className="p-1.5 -mr-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition"
           >
             <X className="w-5 h-5" />
@@ -135,10 +131,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             />
           </div>
 
-          {/* Select Dealer */}
+          {/* Select Wallet */}
           <div>
             <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-              Select Dealer *
+              Select Wallet *
             </label>
             <select
               required
@@ -148,13 +144,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             >
               {dealers.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} ({d.dealer_number})
+                  {d.wallet_number} {d.notes ? `(${d.notes})` : ''}
                 </option>
               ))}
             </select>
-            {selectedDealer && (
-              <p className="text-[11px] text-slate-500 font-mono mt-1 px-1">
-                Wallet: <strong className="text-emerald-700">{selectedDealer.wallet_number}</strong>
+            {selectedDealer?.notes && (
+              <p className="text-[11px] text-slate-500 italic mt-1 px-1">
+                Note: {selectedDealer.notes}
               </p>
             )}
           </div>
@@ -169,22 +165,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDate(getTodayStr())}
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition ${
-                    date === getTodayStr()
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition ${date === getTodayStr()
                       ? 'bg-sky-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                    }`}
                 >
                   Today
                 </button>
                 <button
                   type="button"
                   onClick={() => setDate(getYesterdayStr())}
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition ${
-                    date === getYesterdayStr()
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition ${date === getYesterdayStr()
                       ? 'bg-sky-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                    }`}
                 >
                   Yesterday
                 </button>
@@ -196,20 +190,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full px-3.5 py-2.5 text-sm font-semibold border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-sky-500 bg-white"
-            />
-          </div>
-
-          {/* Reference # */}
-          <div>
-            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-              Invoice / Ref # (Optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. INV-1001"
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm font-mono border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-sky-500"
             />
           </div>
 

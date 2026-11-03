@@ -23,14 +23,14 @@ create table public.app_users (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 2. DEALERS TABLE
+-- 2. WALLETS TABLE (formerly dealers)
 create table public.dealers (
     id uuid primary key default gen_random_uuid(),
-    name text not null,
-    dealer_number text not null,
     wallet_number text not null,
-    phone text,
     notes text,
+    name text default '',
+    dealer_number text default '',
+    phone text,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

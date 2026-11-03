@@ -37,8 +37,8 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         const q = searchTerm.toLowerCase();
         const dName = tx.dealer?.name?.toLowerCase() || '';
         const dNum = tx.dealer?.dealer_number?.toLowerCase() || '';
-        const ref = tx.reference_no?.toLowerCase() || '';
-        if (!dName.includes(q) && !dNum.includes(q) && !ref.includes(q)) return false;
+        const notes = (tx.notes || tx.description || '').toLowerCase();
+        if (!dName.includes(q) && !dNum.includes(q) && !notes.includes(q)) return false;
       }
       return true;
     });
@@ -51,10 +51,9 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   const handleExport = () => {
     const rows = filtered.map((tx) => ({
       Date: tx.date,
-      Dealer: tx.dealer?.name || '',
-      Dealer_No: tx.dealer?.dealer_number || '',
+      Wallet: tx.dealer?.wallet_number || tx.dealer?.name || '',
       Amount: tx.amount,
-      Reference: tx.reference_no || '',
+      Notes: tx.notes || tx.description || '',
     }));
     exportToCSV('Transactions', rows);
   };
@@ -91,10 +90,10 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
           onChange={(e) => setSelectedDealerId(e.target.value)}
           className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
         >
-          <option value="ALL">All Dealers ({dealers.length})</option>
+          <option value="ALL">All Wallets ({dealers.length})</option>
           {dealers.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.name} ({d.dealer_number})
+              {d.wallet_number} {d.notes ? `(${d.notes})` : ''}
             </option>
           ))}
         </select>
@@ -131,18 +130,13 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-base leading-tight">
-                    {tx.dealer?.name || 'Dealer'}
+                  <h4 className="font-extrabold text-slate-900 text-base font-mono leading-tight">
+                    {tx.dealer?.wallet_number || 'Wallet'}
                   </h4>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-500 font-mono">
                     <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg">
                       {formatDate(tx.date)}
                     </span>
-                    {tx.reference_no && (
-                      <span className="bg-sky-50 text-sky-800 font-semibold px-2 py-0.5 rounded-lg">
-                        Ref: {tx.reference_no}
-                      </span>
-                    )}
                   </div>
                 </div>
 
@@ -175,7 +169,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm(`Delete transaction of ${formatCurrency(tx.amount)} for "${tx.dealer?.name || 'Dealer'}"?`)) {
+                    if (window.confirm(`Delete transaction of ${formatCurrency(tx.amount)} for "${tx.dealer?.wallet_number || 'Wallet'}"?`)) {
                       onDeleteTransaction(tx.id);
                     }
                   }}

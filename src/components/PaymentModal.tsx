@@ -23,7 +23,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [amount, setAmount] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState('Wallet');
-  const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,14 +40,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setAmount(paymentToEdit.amount?.toString() || '');
       setDate(paymentToEdit.date || getTodayStr());
       setPaymentMethod(paymentToEdit.payment_method || 'Wallet');
-      setReferenceNo(paymentToEdit.reference_no || '');
       setNotes(paymentToEdit.notes || '');
     } else {
       setDealerId(defaultDealerId || (dealers.length > 0 ? dealers[0].id : ''));
       setAmount('');
       setDate(getTodayStr());
       setPaymentMethod('Wallet');
-      setReferenceNo('');
       setNotes('');
     }
     setError(null);
@@ -59,7 +56,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dealerId) {
-      setError('Please select a dealer.');
+      setError('Please select a wallet.');
       return;
     }
     const numAmount = parseFloat(amount);
@@ -76,7 +73,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         amount: numAmount,
         date: date || getTodayStr(),
         payment_method: paymentMethod,
-        reference_no: referenceNo.trim() || undefined,
         notes: notes.trim() || undefined,
       });
       onClose();
@@ -139,10 +135,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             />
           </div>
 
-          {/* Select Dealer */}
+          {/* Select Wallet */}
           <div>
             <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-              Select Dealer *
+              Select Wallet *
             </label>
             <select
               required
@@ -152,13 +148,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             >
               {dealers.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} ({d.dealer_number})
+                  {d.wallet_number} {d.notes ? `(${d.notes})` : ''}
                 </option>
               ))}
             </select>
-            {selectedDealer && (
-              <p className="text-[11px] text-slate-500 font-mono mt-1 px-1">
-                Wallet: <strong className="text-emerald-700">{selectedDealer.wallet_number}</strong>
+            {selectedDealer?.notes && (
+              <p className="text-[11px] text-slate-500 italic mt-1 px-1">
+                Note: {selectedDealer.notes}
               </p>
             )}
           </div>
@@ -203,37 +199,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             />
           </div>
 
-          {/* Payment Method & Reference # */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-                Method
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm font-semibold border-2 border-slate-200 rounded-2xl bg-white focus:outline-none focus:border-emerald-500"
-              >
-                <option value="Wallet">Wallet</option>
-                <option value="Bank">Bank</option>
-                <option value="Cash">Cash</option>
-                <option value="Mobile">Mobile</option>
-                <option value="Cheque">Cheque</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-                Ref / Txn #
-              </label>
-              <input
-                type="text"
-                placeholder="TXN-998"
-                value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm font-mono border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+          {/* Payment Method */}
+          <div>
+            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
+              Payment Method
+            </label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm font-semibold border-2 border-slate-200 rounded-2xl bg-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="Wallet">Wallet</option>
+              <option value="Bank">Bank</option>
+              <option value="Cash">Cash</option>
+              <option value="Mobile">Mobile</option>
+              <option value="Cheque">Cheque</option>
+            </select>
           </div>
 
           {/* Note / Remarks */}

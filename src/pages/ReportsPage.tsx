@@ -1,836 +1,440 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  FileSpreadsheet, 
-  Users, 
+  Wallet as WalletIcon, 
   Calendar, 
-  CalendarDays, 
+  CalendarDays,
   Download, 
-  Printer,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpRight,
-  ArrowDownLeft
+  Printer, 
+  Search,
+  RotateCcw
 } from 'lucide-react';
 import { Dealer, Transaction, Payment } from '../types';
-import { formatCurrency, formatDate, exportToCSV } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
+import { exportWalletReportToPDF } from '../utils/pdfExport';
 
 interface ReportsPageProps {
   dealers: Dealer[];
   transactions: Transaction[];
-  payments: Payment[];
+  payments?: Payment[];
   onEditTransaction?: (tx: Transaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onEditPayment?: (payment: Payment) => void;
   onDeletePayment?: (id: string) => void;
 }
 
-type ReportTab = 'dealers' | 'daily' | 'monthly';
-
 export const ReportsPage: React.FC<ReportsPageProps> = ({
   dealers,
   transactions,
-  payments,
-  onEditTransaction,
-  onDeleteTransaction,
-  onEditPayment,
-  onDeletePayment,
 }) => {
-  const [activeTab, setActiveTab] = useState<ReportTab>('dealers');
-
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
-  const getYesterdayStr = () => {
+  const getTodayStr = () => {
     const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
-  const getLastMonthStr = () => {
+  const getCurrentMonthStr = () => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 7);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
   };
 
-  const [dailyDate, setDailyDate] = useState<string>(getTodayStr());
-  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthStr());
-  const [expandedDealerId, setExpandedDealerId] = useState<string | null>(null);
+  const todayStr = getTodayStr();
+  const currentMonthStr = getCurrentMonthStr();
 
-  const toggleExpand = (id: string) => {
-    setExpandedDealerId(expandedDealerId === id ? null : id);
-  };
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // ==============================================================
-  // 1. ALL-TIME DEALER-WISE REPORT
-  // ==============================================================
-  const allTimeDealerData = useMemo(() => {
+  const isViewingToday = selectedDate === todayStr;
+  const isViewingCurrentMonth = selectedMonth === currentMonthStr;
+
+  // Month label (e.g. "Nov 2026")
+  const targetMonthLabel = useMemo(() => {
+    try {
+      const [y, m] = selectedMonth.split('-');
+      const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+    } catch {
+      return selectedMonth;
+    }
+  }, [selectedMonth]);
+
+  // Compute dealer-wise report data
+  const reportData = useMemo(() => {
     return dealers.map((dealer) => {
       const dTx = transactions.filter((t) => t.dealer_id === dealer.id);
-      const dPay = payments.filter((p) => p.dealer_id === dealer.id);
-      const totalTx = dTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      const totalPay = dPay.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      // Today / Selected Day Transaction Total
+      const todayTxList = dTx.filter((t) => t.date === selectedDate);
+      const todayTx = todayTxList.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+      // Monthly Transaction Total based on selectedMonth (YYYY-MM)
+      const monthlyTxList = dTx.filter((t) => t.date && t.date.slice(0, 7) === selectedMonth);
+      const monthlyTx = monthlyTxList.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
       return {
         dealer,
-        totalTx,
-        totalPay,
-        balance: totalTx - totalPay,
-        transactions: dTx,
-        payments: dPay,
+        todayTx,
+        monthlyTx,
+        todayCount: todayTxList.length,
+        monthlyCount: monthlyTxList.length,
       };
     });
-  }, [dealers, transactions, payments]);
+  }, [dealers, transactions, selectedDate, selectedMonth]);
 
-  const allTimeTotals = useMemo(() => {
-    return allTimeDealerData.reduce(
-      (acc, curr) => {
-        acc.totalTx += curr.totalTx;
-        acc.totalPay += curr.totalPay;
-        acc.balance += curr.balance;
+  // Filtered by search term
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return reportData;
+    const q = searchTerm.toLowerCase().trim();
+    return reportData.filter((row) => {
+      const num = (row.dealer.wallet_number || row.dealer.dealer_number || '').toLowerCase();
+      const note = (row.dealer.notes || row.dealer.name || '').toLowerCase();
+      return num.includes(q) || note.includes(q);
+    });
+  }, [reportData, searchTerm]);
+
+  // Grand Totals
+  const totals = useMemo(() => {
+    return filteredData.reduce(
+      (acc, row) => {
+        acc.todayTx += row.todayTx;
+        acc.monthlyTx += row.monthlyTx;
+        acc.todayCount += row.todayCount;
+        acc.monthlyCount += row.monthlyCount;
         return acc;
       },
-      { totalTx: 0, totalPay: 0, balance: 0 }
+      { todayTx: 0, monthlyTx: 0, todayCount: 0, monthlyCount: 0 }
     );
-  }, [allTimeDealerData]);
+  }, [filteredData]);
 
-  // ==============================================================
-  // 2. DAILY DEALER-WISE REPORT
-  // ==============================================================
-  const dailyDealerData = useMemo(() => {
-    return dealers
-      .map((dealer) => {
-        const dTx = transactions.filter(
-          (t) => t.dealer_id === dealer.id && t.date === dailyDate
-        );
-        const dPay = payments.filter(
-          (p) => p.dealer_id === dealer.id && p.date === dailyDate
-        );
+  const handleExportPDF = () => {
+    const rows = filteredData.map((row) => ({
+      walletNumber: row.dealer.wallet_number || row.dealer.dealer_number || '',
+      note: row.dealer.notes || '',
+      todayTx: row.todayTx,
+      monthlyTx: row.monthlyTx,
+    }));
 
-        const totalTx = dTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        const totalPay = dPay.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-
-        return {
-          dealer,
-          totalTx,
-          totalPay,
-          balance: totalTx - totalPay,
-          transactions: dTx,
-          payments: dPay,
-          hasActivity: dTx.length > 0 || dPay.length > 0,
-        };
-      })
-      .filter((item) => item.hasActivity);
-  }, [dealers, transactions, payments, dailyDate]);
-
-  const dailyTotals = useMemo(() => {
-    return dailyDealerData.reduce(
-      (acc, curr) => {
-        acc.totalTx += curr.totalTx;
-        acc.totalPay += curr.totalPay;
-        acc.balance += curr.balance;
-        return acc;
+    exportWalletReportToPDF({
+      rows,
+      totals: {
+        todayTx: totals.todayTx,
+        monthlyTx: totals.monthlyTx,
+        walletCount: filteredData.length,
       },
-      { totalTx: 0, totalPay: 0, balance: 0 }
-    );
-  }, [dailyDealerData]);
+      selectedDate,
+      monthLabel: targetMonthLabel,
+    });
+  };
 
-  // ==============================================================
-  // 3. MONTHLY DEALER-WISE REPORT
-  // ==============================================================
-  const monthlyDealerData = useMemo(() => {
-    return dealers
-      .map((dealer) => {
-        const dTx = transactions.filter(
-          (t) => t.dealer_id === dealer.id && t.date && t.date.startsWith(selectedMonth)
-        );
-        const dPay = payments.filter(
-          (p) => p.dealer_id === dealer.id && p.date && p.date.startsWith(selectedMonth)
-        );
-
-        const totalTx = dTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        const totalPay = dPay.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-
-        return {
-          dealer,
-          totalTx,
-          totalPay,
-          balance: totalTx - totalPay,
-          transactions: dTx,
-          payments: dPay,
-          hasActivity: dTx.length > 0 || dPay.length > 0,
-        };
-      })
-      .filter((item) => item.hasActivity);
-  }, [dealers, transactions, payments, selectedMonth]);
-
-  const monthlyTotals = useMemo(() => {
-    return monthlyDealerData.reduce(
-      (acc, curr) => {
-        acc.totalTx += curr.totalTx;
-        acc.totalPay += curr.totalPay;
-        acc.balance += curr.balance;
-        return acc;
-      },
-      { totalTx: 0, totalPay: 0, balance: 0 }
-    );
-  }, [monthlyDealerData]);
-
-  // ==============================================================
-  // CSV EXPORT (DEALER WISE)
-  // ==============================================================
-  const handleExport = () => {
-    if (activeTab === 'dealers') {
-      const rows: Record<string, any>[] = allTimeDealerData.map((d) => ({
-        Dealer_Name: d.dealer.name,
-        Dealer_No: d.dealer.dealer_number,
-        Wallet_No: d.dealer.wallet_number,
-        Transactions: d.totalTx,
-        Payments: d.totalPay,
-        Balance: d.balance,
-      }));
-      rows.push({
-        Dealer_Name: 'TOTAL ALL DEALERS',
-        Dealer_No: '',
-        Wallet_No: '',
-        Transactions: allTimeTotals.totalTx,
-        Payments: allTimeTotals.totalPay,
-        Balance: allTimeTotals.balance,
-      });
-      exportToCSV('All_Dealers_Report', rows);
-    } else if (activeTab === 'daily') {
-      const rows: Record<string, any>[] = dailyDealerData.map((d) => ({
-        Date: dailyDate,
-        Dealer_Name: d.dealer.name,
-        Dealer_No: d.dealer.dealer_number,
-        Wallet_No: d.dealer.wallet_number,
-        Daily_Transactions: d.totalTx,
-        Daily_Payments: d.totalPay,
-        Daily_Balance: d.balance,
-      }));
-      rows.push({
-        Date: dailyDate,
-        Dealer_Name: 'TOTAL ALL DEALERS',
-        Dealer_No: '',
-        Wallet_No: '',
-        Daily_Transactions: dailyTotals.totalTx,
-        Daily_Payments: dailyTotals.totalPay,
-        Daily_Balance: dailyTotals.balance,
-      });
-      exportToCSV(`Daily_Dealer_Report_${dailyDate}`, rows);
-    } else {
-      const rows: Record<string, any>[] = monthlyDealerData.map((d) => ({
-        Month: selectedMonth,
-        Dealer_Name: d.dealer.name,
-        Dealer_No: d.dealer.dealer_number,
-        Wallet_No: d.dealer.wallet_number,
-        Monthly_Transactions: d.totalTx,
-        Monthly_Payments: d.totalPay,
-        Monthly_Balance: d.balance,
-      }));
-      rows.push({
-        Month: selectedMonth,
-        Dealer_Name: 'TOTAL ALL DEALERS',
-        Dealer_No: '',
-        Wallet_No: '',
-        Monthly_Transactions: monthlyTotals.totalTx,
-        Monthly_Payments: monthlyTotals.totalPay,
-        Monthly_Balance: monthlyTotals.balance,
-      });
-      exportToCSV(`Monthly_Dealer_Report_${selectedMonth}`, rows);
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div className="space-y-3 pb-8">
-      {/* Top Header */}
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-extrabold text-slate-900">Dealer Reports</h2>
-        <div className="flex items-center gap-1.5 no-print">
+    <div className="space-y-4 pb-12">
+      {/* Header & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <WalletIcon className="w-6 h-6 text-sky-600" />
+            Wallet Report
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Wallet-wise Today & Monthly Transaction Summary
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto print:hidden">
           <button
-            onClick={() => window.print()}
-            className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl hover:bg-slate-50 transition active:scale-95"
-            title="Print"
+            type="button"
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition shadow-sm active:scale-95"
+            title="Download report as PDF"
           >
-            <Printer className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5 text-white" />
+            Download PDF
           </button>
           <button
-            onClick={handleExport}
-            className="p-2.5 bg-sky-600 text-white rounded-2xl hover:bg-sky-700 transition active:scale-95"
-            title="Export CSV"
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-2xs active:scale-95"
+            title="Print report"
           >
-            <Download className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5 text-slate-500" />
+            Print
           </button>
         </div>
       </div>
 
-      {/* 3 Mobile Segmented Tabs */}
-      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-200/90 rounded-2xl text-xs font-extrabold no-print">
-        <button
-          onClick={() => {
-            setActiveTab('dealers');
-            setExpandedDealerId(null);
-          }}
-          className={`py-2.5 rounded-xl text-center transition active:scale-95 ${
-            activeTab === 'dealers'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          All Dealers
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('daily');
-            setExpandedDealerId(null);
-          }}
-          className={`py-2.5 rounded-xl text-center transition active:scale-95 ${
-            activeTab === 'daily'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Daily (Dealer)
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('monthly');
-            setExpandedDealerId(null);
-          }}
-          className={`py-2.5 rounded-xl text-center transition active:scale-95 ${
-            activeTab === 'monthly'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Monthly (Dealer)
-        </button>
-      </div>
-
-      {/* ==================== 1. ALL-TIME DEALER-WISE REPORT ==================== */}
-      {activeTab === 'dealers' && (
-        <div className="space-y-2.5">
-          {allTimeDealerData.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
-              No dealers found.
-            </div>
-          ) : (
-            allTimeDealerData.map((item) => {
-              const isExpanded = expandedDealerId === item.dealer.id;
-              const isDue = item.balance > 0;
-              return (
-                <div
-                  key={item.dealer.id}
-                  className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-2.5 transition"
-                >
-                  <div 
-                    onClick={() => toggleExpand(item.dealer.id)}
-                    className="flex items-start justify-between gap-2 cursor-pointer"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-extrabold text-slate-900 text-base leading-tight">
-                          {item.dealer.name}
-                        </h4>
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-slate-400" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-slate-400" />
-                        )}
-                      </div>
-                      <div className="flex gap-1.5 text-xs font-mono mt-1">
-                        <span className="text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded-lg">
-                          No: {item.dealer.dealer_number}
-                        </span>
-                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-lg">
-                          Wlt: {item.dealer.wallet_number}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[11px] font-bold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-xl">
-                        {isExpanded ? 'Hide Details' : 'View Details'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-slate-100">
-                    <div className="bg-slate-50 p-2.5 rounded-xl">
-                      <span className="text-[10px] text-slate-500 font-sans block font-semibold">Total Tx</span>
-                      <span className="font-extrabold text-slate-900">{formatCurrency(item.totalTx)}</span>
-                    </div>
-                    <div className="bg-slate-50 p-2.5 rounded-xl text-right">
-                      <span className="text-[10px] text-slate-500 font-sans block font-semibold">Total Paid</span>
-                      <span className="font-extrabold text-emerald-700">{formatCurrency(item.totalPay)}</span>
-                    </div>
-                  </div>
-
-                  {/* Expandable itemized entries for this dealer */}
-                  {isExpanded && (
-                    <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                      <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                        Transactions for {item.dealer.name} ({item.transactions.length})
-                      </p>
-                      {item.transactions.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">No transactions recorded.</p>
-                      ) : (
-                        item.transactions.map((tx) => (
-                          <div
-                            key={tx.id}
-                            className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-slate-600 font-sans block">
-                                {formatDate(tx.date)} {tx.reference_no && `[${tx.reference_no}]`}
-                              </span>
-                              {(tx.notes || tx.description) && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {tx.notes || tx.description}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">{formatCurrency(tx.amount)}</span>
-                              {(onEditTransaction || onDeleteTransaction) && (
-                                <div className="flex items-center gap-1 font-sans">
-                                  {onEditTransaction && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onEditTransaction(tx)}
-                                      className="px-2 py-0.5 text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 rounded-lg transition"
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
-                                  {onDeleteTransaction && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (window.confirm('Delete this transaction?')) onDeleteTransaction(tx.id);
-                                      }}
-                                      className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 rounded-lg transition"
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-
-                      <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider pt-1.5">
-                        Payments for {item.dealer.name} ({item.payments.length})
-                      </p>
-                      {item.payments.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">No payments recorded.</p>
-                      ) : (
-                        item.payments.map((p) => (
-                          <div
-                            key={p.id}
-                            className="p-2.5 bg-emerald-50/60 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-emerald-800 font-sans block">
-                                {formatDate(p.date)} ({p.payment_method || 'Wallet'})
-                              </span>
-                              {p.notes && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {p.notes}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
-                              {(onEditPayment || onDeletePayment) && (
-                                <div className="flex items-center gap-1 font-sans">
-                                  {onEditPayment && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onEditPayment(p)}
-                                      className="px-2 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition"
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
-                                  {onDeletePayment && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (window.confirm('Delete this payment record?')) onDeletePayment(p.id);
-                                      }}
-                                      className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 rounded-lg transition"
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-
-          {/* IN BOTTOM WE SEE TOTAL */}
-          <div className="bg-slate-900 text-white rounded-3xl p-4 shadow-xl space-y-2 mt-4">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 block">
-              TOTAL FOR ALL DEALERS
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {/* Today Transaction Card */}
+        <div className="bg-white rounded-2xl border-2 border-sky-100 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-700">
+              {isViewingToday ? 'Today Transaction' : `Tx (${selectedDate})`}
             </span>
-            <div className="grid grid-cols-2 gap-4 font-mono text-center pt-2 border-t border-slate-800">
-              <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Tx</span>
-                <span className="font-extrabold text-sky-400 text-sm sm:text-base">
-                  {formatCurrency(allTimeTotals.totalTx)}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Paid</span>
-                <span className="font-extrabold text-emerald-400 text-sm sm:text-base">
-                  {formatCurrency(allTimeTotals.totalPay)}
-                </span>
-              </div>
-            </div>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700">
+              {totals.todayCount} tx
+            </span>
+          </div>
+          <div className="mt-1 font-mono font-black text-lg sm:text-2xl text-slate-900">
+            {formatCurrency(totals.todayTx)}
           </div>
         </div>
-      )}
 
-      {/* ==================== 2. DAILY DEALER-WISE REPORT ==================== */}
-      {activeTab === 'daily' && (
-        <div className="space-y-2.5">
-          {/* Quick Date Selector Bar */}
-          <div className="bg-white p-3 rounded-3xl border-2 border-slate-200/90 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-                Select Date
-              </label>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setDailyDate(getTodayStr())}
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full transition ${
-                    dailyDate === getTodayStr()
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDailyDate(getYesterdayStr())}
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full transition ${
-                    dailyDate === getYesterdayStr()
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  Yesterday
-                </button>
-              </div>
-            </div>
+        {/* Monthly Transaction Card */}
+        <div className="bg-white rounded-2xl border-2 border-indigo-100 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700">
+              Monthly Transaction
+            </span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+              {targetMonthLabel}
+            </span>
+          </div>
+          <div className="mt-1 font-mono font-black text-lg sm:text-2xl text-slate-900">
+            {formatCurrency(totals.monthlyTx)}
+          </div>
+        </div>
+
+        {/* Total Wallets Card */}
+        <div className="col-span-2 sm:col-span-1 bg-white rounded-2xl border-2 border-slate-200 p-3.5 shadow-xs flex items-center justify-between sm:block">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+            Total Wallets
+          </span>
+          <div className="mt-0.5 sm:mt-1 font-mono font-black text-lg sm:text-2xl text-slate-800">
+            {filteredData.length}
+            {dealers.length !== filteredData.length && (
+              <span className="text-xs font-normal text-slate-400 ml-1">
+                of {dealers.length}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Date / Month Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 print:hidden">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search wallet number or note..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        {/* Pickers for Day and Month */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Day / Date Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 border border-slate-200 rounded-xl">
+            <Calendar className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Day:</span>
             <input
               type="date"
-              value={dailyDate}
-              onChange={(e) => setDailyDate(e.target.value)}
-              className="w-full text-sm font-bold text-slate-900 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value || todayStr)}
+              className="text-xs font-mono font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
             />
-          </div>
-
-          <div className="space-y-2">
-            {dailyDealerData.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
-                No dealer transactions on {formatDate(dailyDate)}.
-              </div>
-            ) : (
-              dailyDealerData.map((item) => {
-                const isExpanded = expandedDealerId === item.dealer.id;
-                return (
-                  <div
-                    key={item.dealer.id}
-                    className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-2.5"
-                  >
-                    <div 
-                      onClick={() => toggleExpand(item.dealer.id)}
-                      className="flex items-start justify-between gap-2 cursor-pointer"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-extrabold text-slate-900 text-base leading-tight">
-                            {item.dealer.name}
-                          </h4>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">
-                          No: {item.dealer.dealer_number} • Wlt: {item.dealer.wallet_number}
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[11px] font-bold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-xl">
-                          {isExpanded ? 'Hide Details' : 'View Details'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-slate-100">
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        <span className="text-[10px] text-slate-500 font-sans block font-semibold">Today Tx</span>
-                        <span className="font-extrabold text-slate-900">{formatCurrency(item.totalTx)}</span>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl text-right">
-                        <span className="text-[10px] text-slate-500 font-sans block font-semibold">Today Paid</span>
-                        <span className="font-extrabold text-emerald-700">{formatCurrency(item.totalPay)}</span>
-                      </div>
-                    </div>
-
-                    {/* Breakdown list for this dealer today */}
-                    {isExpanded && (
-                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                        {item.transactions.map((tx) => (
-                          <div
-                            key={tx.id}
-                            className="p-2 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-slate-600 font-sans block">
-                                Transaction {tx.reference_no && `[${tx.reference_no}]`}
-                              </span>
-                              {(tx.notes || tx.description) && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {tx.notes || tx.description}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-slate-900">{formatCurrency(tx.amount)}</span>
-                          </div>
-                        ))}
-                        {item.payments.map((p) => (
-                          <div
-                            key={p.id}
-                            className="p-2 bg-emerald-50/60 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-emerald-800 font-sans block">
-                                Payment ({p.payment_method || 'Wallet'}) {p.reference_no && `[${p.reference_no}]`}
-                              </span>
-                              {p.notes && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {p.notes}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+            {!isViewingToday && (
+              <button
+                type="button"
+                onClick={() => setSelectedDate(todayStr)}
+                className="text-[10px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 px-1.5 py-0.5 rounded transition"
+                title="Reset to today"
+              >
+                Today
+              </button>
             )}
           </div>
 
-          {/* IN BOTTOM WE SEE TOTAL */}
-          <div className="bg-slate-900 text-white rounded-3xl p-4 shadow-xl space-y-2 mt-4">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 block">
-              DAILY GRAND TOTAL ({formatDate(dailyDate)})
-            </span>
-            <div className="grid grid-cols-2 gap-4 font-mono text-center pt-2 border-t border-slate-800">
-              <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Tx</span>
-                <span className="font-extrabold text-sky-400 text-sm sm:text-base">
-                  {formatCurrency(dailyTotals.totalTx)}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Paid</span>
-                <span className="font-extrabold text-emerald-400 text-sm sm:text-base">
-                  {formatCurrency(dailyTotals.totalPay)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== 3. MONTHLY DEALER-WISE REPORT ==================== */}
-      {activeTab === 'monthly' && (
-        <div className="space-y-2.5">
-          {/* Quick Month Selector Bar */}
-          <div className="bg-white p-3 rounded-3xl border-2 border-slate-200/90 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-                Select Month
-              </label>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMonth(getCurrentMonthStr())}
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full transition ${
-                    selectedMonth === getCurrentMonthStr()
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  This Month
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedMonth(getLastMonthStr())}
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full transition ${
-                    selectedMonth === getLastMonthStr()
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  Last Month
-                </button>
-              </div>
-            </div>
+          {/* Month Selector */}
+          <div className="flex items-center gap-1.5 bg-indigo-50/70 px-2.5 py-1.5 border border-indigo-200/80 rounded-xl">
+            <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Month:</span>
             <input
               type="month"
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full text-sm font-bold text-slate-900 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none"
+              onChange={(e) => setSelectedMonth(e.target.value || currentMonthStr)}
+              className="text-xs font-mono font-bold text-indigo-950 bg-transparent focus:outline-none cursor-pointer"
             />
-          </div>
-
-          <div className="space-y-2">
-            {monthlyDealerData.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-semibold">
-                No dealer transactions in {selectedMonth}.
-              </div>
-            ) : (
-              monthlyDealerData.map((item) => {
-                const isExpanded = expandedDealerId === item.dealer.id;
-                return (
-                  <div
-                    key={item.dealer.id}
-                    className="bg-white rounded-3xl border-2 border-slate-200/90 p-4 shadow-xs space-y-2.5"
-                  >
-                    <div 
-                      onClick={() => toggleExpand(item.dealer.id)}
-                      className="flex items-start justify-between gap-2 cursor-pointer"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-extrabold text-slate-900 text-base leading-tight">
-                            {item.dealer.name}
-                          </h4>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 font-mono mt-1">
-                          No: {item.dealer.dealer_number} • Wlt: {item.dealer.wallet_number}
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[11px] font-bold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-xl">
-                          {isExpanded ? 'Hide Details' : 'View Details'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-slate-100">
-                      <div className="bg-slate-50 p-2.5 rounded-xl">
-                        <span className="text-[10px] text-slate-500 font-sans block font-semibold">Month Tx</span>
-                        <span className="font-extrabold text-slate-900">{formatCurrency(item.totalTx)}</span>
-                      </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl text-right">
-                        <span className="text-[10px] text-slate-500 font-sans block font-semibold">Month Paid</span>
-                        <span className="font-extrabold text-emerald-700">{formatCurrency(item.totalPay)}</span>
-                      </div>
-                    </div>
-
-                    {/* Breakdown list for this dealer this month */}
-                    {isExpanded && (
-                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                        <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                          Transactions ({item.transactions.length})
-                        </p>
-                        {item.transactions.map((tx) => (
-                          <div
-                            key={tx.id}
-                            className="p-2 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-slate-600 font-sans block">
-                                {formatDate(tx.date)} {tx.reference_no && `[${tx.reference_no}]`}
-                              </span>
-                              {(tx.notes || tx.description) && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {tx.notes || tx.description}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-slate-900">{formatCurrency(tx.amount)}</span>
-                          </div>
-                        ))}
-
-                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider pt-1">
-                          Payments ({item.payments.length})
-                        </p>
-                        {item.payments.map((p) => (
-                          <div
-                            key={p.id}
-                            className="p-2 bg-emerald-50/60 rounded-xl flex items-center justify-between text-xs font-mono"
-                          >
-                            <div>
-                              <span className="text-emerald-800 font-sans block">
-                                {formatDate(p.date)} ({p.payment_method || 'Wallet'}) {p.reference_no && `[${p.reference_no}]`}
-                              </span>
-                              {p.notes && (
-                                <span className="text-[11px] text-slate-500 italic block">
-                                  Note: {p.notes}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+            {!isViewingCurrentMonth && (
+              <button
+                type="button"
+                onClick={() => setSelectedMonth(currentMonthStr)}
+                className="text-[10px] font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-1.5 py-0.5 rounded transition"
+                title="Reset to current month"
+              >
+                Current
+              </button>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* IN BOTTOM WE SEE TOTAL */}
-          <div className="bg-slate-900 text-white rounded-3xl p-4 shadow-xl space-y-2 mt-4">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 block">
-              MONTHLY GRAND TOTAL ({selectedMonth})
-            </span>
-            <div className="grid grid-cols-2 gap-4 font-mono text-center pt-2 border-t border-slate-800">
+      {/* Main Report Table (Desktop & Tablet) */}
+      <div className="hidden sm:block bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-xs">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
+              <th className="py-3 px-4 w-12 text-center text-slate-400">#</th>
+              <th className="py-3 px-4">Wallet</th>
+              <th className="py-3 px-4">Note</th>
+              <th className="py-3 px-4 text-right">Today Transaction</th>
+              <th className="py-3 px-4 text-right">Monthly Transaction ({targetMonthLabel})</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-xs">
+            {filteredData.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-slate-400 font-medium">
+                  No wallets found.
+                </td>
+              </tr>
+            ) : (
+              filteredData.map((row, idx) => (
+                <tr key={row.dealer.id} className="hover:bg-slate-50/70 transition">
+                  <td className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
+                    {idx + 1}
+                  </td>
+                  <td className="py-3 px-4 font-mono font-extrabold text-slate-900">
+                    {row.dealer.wallet_number || row.dealer.dealer_number || 'Wallet'}
+                  </td>
+                  <td className="py-3 px-4 text-slate-500 italic max-w-xs truncate">
+                    {row.dealer.notes || '—'}
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono font-extrabold text-sky-700">
+                    {formatCurrency(row.todayTx)}
+                    {row.todayCount > 0 && (
+                      <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
+                        ({row.todayCount})
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono font-extrabold text-slate-900">
+                    {formatCurrency(row.monthlyTx)}
+                    {row.monthlyCount > 0 && (
+                      <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
+                        ({row.monthlyCount})
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          {filteredData.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-100/80 border-t-2 border-slate-200 text-xs font-black text-slate-900">
+                <td colSpan={3} className="py-3.5 px-4 uppercase tracking-wider text-slate-700">
+                  Total ({filteredData.length} Wallets)
+                </td>
+                <td className="py-3.5 px-4 text-right font-mono text-sm text-sky-700">
+                  {formatCurrency(totals.todayTx)}
+                </td>
+                <td className="py-3.5 px-4 text-right font-mono text-sm text-slate-900">
+                  {formatCurrency(totals.monthlyTx)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      {/* Main Report Cards (Mobile) */}
+      <div className="sm:hidden space-y-2.5">
+        {filteredData.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs font-medium">
+            No wallets found.
+          </div>
+        ) : (
+          filteredData.map((row) => (
+            <div
+              key={row.dealer.id}
+              className="bg-white rounded-2xl border-2 border-slate-200/90 p-3.5 shadow-2xs space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-sm font-mono font-black text-slate-900">
+                    {row.dealer.wallet_number || row.dealer.dealer_number || 'Wallet'}
+                  </span>
+                  {row.dealer.notes && (
+                    <p className="text-[11px] text-slate-500 italic mt-0.5">
+                      Note: {row.dealer.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                <div className="bg-sky-50/60 rounded-xl p-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 block">
+                    Today Tx
+                  </span>
+                  <span className="font-mono font-black text-sm text-sky-800">
+                    {formatCurrency(row.todayTx)}
+                  </span>
+                  {row.todayCount > 0 && (
+                    <span className="text-[10px] text-sky-600 block">
+                      {row.todayCount} tx
+                    </span>
+                  )}
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 block">
+                    Monthly Tx ({targetMonthLabel})
+                  </span>
+                  <span className="font-mono font-black text-sm text-slate-900">
+                    {formatCurrency(row.monthlyTx)}
+                  </span>
+                  {row.monthlyCount > 0 && (
+                    <span className="text-[10px] text-slate-500 block">
+                      {row.monthlyCount} tx
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Mobile Grand Total Summary Box */}
+        {filteredData.length > 0 && (
+          <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-lg space-y-2 mt-4">
+            <div className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider">
+              <span>Grand Total</span>
+              <span>{filteredData.length} Wallets</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-800 font-mono">
               <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Tx</span>
-                <span className="font-extrabold text-sky-400 text-sm sm:text-base">
-                  {formatCurrency(monthlyTotals.totalTx)}
+                <span className="text-[10px] text-sky-300 uppercase block font-semibold">
+                  Today Total
+                </span>
+                <span className="text-base font-extrabold text-white">
+                  {formatCurrency(totals.todayTx)}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] font-sans text-slate-400 block font-bold">Total Paid</span>
-                <span className="font-extrabold text-emerald-400 text-sm sm:text-base">
-                  {formatCurrency(monthlyTotals.totalPay)}
+                <span className="text-[10px] text-slate-400 uppercase block font-semibold">
+                  Monthly Total
+                </span>
+                <span className="text-base font-extrabold text-white">
+                  {formatCurrency(totals.monthlyTx)}
                 </span>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

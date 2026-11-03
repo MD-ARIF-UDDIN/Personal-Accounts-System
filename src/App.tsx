@@ -163,23 +163,23 @@ export function App() {
     showToast('Signed out.');
   };
 
-  // DEALER ACTIONS (Instant Optimistic UI)
+  // WALLET ACTIONS (Instant Optimistic UI)
   const handleSaveDealer = async (dealerData: Omit<Dealer, 'id' | 'created_at'>) => {
     try {
       if (dealerToEdit) {
         setDealers((prev) =>
           prev.map((d) => (d.id === dealerToEdit.id ? { ...d, ...dealerData } : d))
         );
-        showToast('Dealer updated.');
+        showToast('Wallet updated.');
         const updated = await api.updateDealer(dealerToEdit.id, dealerData);
         setDealers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
       } else {
         const created = await api.createDealer(dealerData);
         setDealers((prev) => [created, ...prev]);
-        showToast('New dealer added.');
+        showToast('New wallet added.');
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to save dealer.', 'error');
+      showToast(err.message || 'Failed to save wallet.', 'error');
       fetchData();
     }
   };
@@ -187,12 +187,12 @@ export function App() {
   const handleDeleteDealer = async (id: string) => {
     const backup = [...dealers];
     setDealers((prev) => prev.filter((d) => d.id !== id));
-    showToast('Dealer deleted.');
+    showToast('Wallet deleted.');
     try {
       await api.deleteDealer(id);
     } catch (err: any) {
       setDealers(backup);
-      showToast(err.message || 'Failed to delete dealer.', 'error');
+      showToast(err.message || 'Failed to delete wallet.', 'error');
     }
   };
 

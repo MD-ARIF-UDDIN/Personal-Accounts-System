@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Wallet } from 'lucide-react';
 import { Dealer } from '../types';
 
 interface DealerModalProps {
@@ -15,26 +15,17 @@ export const DealerModal: React.FC<DealerModalProps> = ({
   onSave,
   dealerToEdit,
 }) => {
-  const [name, setName] = useState('');
-  const [dealerNumber, setDealerNumber] = useState('');
   const [walletNumber, setWalletNumber] = useState('');
-  const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (dealerToEdit) {
-      setName(dealerToEdit.name || '');
-      setDealerNumber(dealerToEdit.dealer_number || '');
       setWalletNumber(dealerToEdit.wallet_number || '');
-      setPhone(dealerToEdit.phone || '');
       setNotes(dealerToEdit.notes || '');
     } else {
-      setName('');
-      setDealerNumber('');
       setWalletNumber('');
-      setPhone('');
       setNotes('');
     }
     setError(null);
@@ -44,14 +35,6 @@ export const DealerModal: React.FC<DealerModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setError('Please enter dealer name.');
-      return;
-    }
-    if (!dealerNumber.trim()) {
-      setError('Please enter dealer number.');
-      return;
-    }
     if (!walletNumber.trim()) {
       setError('Please enter wallet number.');
       return;
@@ -61,15 +44,14 @@ export const DealerModal: React.FC<DealerModalProps> = ({
     setError(null);
     try {
       await onSave({
-        name: name.trim(),
-        dealer_number: dealerNumber.trim(),
         wallet_number: walletNumber.trim(),
-        phone: phone.trim() || undefined,
+        name: walletNumber.trim(),
+        dealer_number: walletNumber.trim(),
         notes: notes.trim() || undefined,
       });
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to save.');
+      setError(err.message || 'Failed to save wallet.');
     } finally {
       setLoading(false);
     }
@@ -77,107 +59,84 @@ export const DealerModal: React.FC<DealerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full overflow-hidden border border-slate-200 shadow-2xl">
-        <div className="flex items-center justify-between p-4 border-b border-slate-100">
-          <h3 className="font-extrabold text-slate-900 text-base">
-            {dealerToEdit ? 'Edit Dealer' : 'Add Dealer'}
-          </h3>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full overflow-hidden border border-slate-200 shadow-2xl safe-bottom max-h-[92vh] flex flex-col">
+        {/* Mobile drag handle */}
+        <div className="pt-2 pb-1 sm:hidden">
+          <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-sky-50 text-sky-600 rounded-xl">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 text-base">
+              {dealerToEdit ? 'Edit Wallet' : 'Add Wallet'}
+            </h3>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="p-1.5 -mr-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        {/* Form Body - 2 Fields Only */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           {error && (
-            <div className="p-2.5 text-xs bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-medium">
+            <div className="p-3 text-xs bg-rose-50 text-rose-700 border border-rose-200 rounded-2xl font-semibold">
               {error}
             </div>
           )}
 
+          {/* 1. Wallet Number */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Dealer Name *
+            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
+              Wallet Number *
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Rahim Enterprise"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+              autoFocus
+              placeholder="e.g. WLT-8849 or 01711223344"
+              value={walletNumber}
+              onChange={(e) => setWalletNumber(e.target.value)}
+              className="w-full px-4 py-3 text-lg font-mono font-bold border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-sky-500 text-slate-900 shadow-2xs"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Dealer Number *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="DLR-001"
-                value={dealerNumber}
-                onChange={(e) => setDealerNumber(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Wallet Number *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="WLT-8849"
-                value={walletNumber}
-                onChange={(e) => setWalletNumber(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-semibold"
-              />
-            </div>
-          </div>
-
+          {/* 2. Note / Remarks */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Phone (Optional)
-            </label>
-            <input
-              type="text"
-              placeholder="+12345678"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
               Note / Remarks (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g. Branch, area or terms"
+              placeholder="e.g. Personal bKash, Nagad agent, Branch wallet"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+              className="w-full px-3.5 py-3 text-sm border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
             />
           </div>
 
+          {/* Action Buttons */}
           <div className="pt-2 flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-2xl transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition active:scale-95"
+              className="flex-1 py-3 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-2xl shadow-md transition active:scale-95 disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Save Dealer'}
+              {loading ? 'Saving...' : 'Save Wallet'}
             </button>
           </div>
         </form>

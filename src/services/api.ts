@@ -136,12 +136,16 @@ export const api = {
   },
 
   async createDealer(dealer: Omit<Dealer, 'id' | 'created_at'>): Promise<Dealer> {
+    const cleanWallet = dealer.wallet_number.trim();
+    const cleanName = dealer.name?.trim() || cleanWallet;
+    const cleanDealerNum = dealer.dealer_number?.trim() || cleanWallet;
+
     const { data, error } = await supabase
       .from('dealers')
       .insert([{
-        name: dealer.name.trim(),
-        dealer_number: dealer.dealer_number.trim(),
-        wallet_number: dealer.wallet_number.trim(),
+        name: cleanName,
+        dealer_number: cleanDealerNum,
+        wallet_number: cleanWallet,
         phone: dealer.phone?.trim() || null,
         notes: dealer.notes?.trim() || null,
       }])
@@ -153,12 +157,15 @@ export const api = {
   },
 
   async updateDealer(id: string, updates: Partial<Dealer>): Promise<Dealer> {
+    const cleanWallet = updates.wallet_number ? updates.wallet_number.trim() : undefined;
     const { data, error } = await supabase
       .from('dealers')
       .update({
-        ...(updates.name && { name: updates.name.trim() }),
-        ...(updates.dealer_number && { dealer_number: updates.dealer_number.trim() }),
-        ...(updates.wallet_number && { wallet_number: updates.wallet_number.trim() }),
+        ...(cleanWallet && { 
+          wallet_number: cleanWallet,
+          name: updates.name ? updates.name.trim() : cleanWallet,
+          dealer_number: updates.dealer_number ? updates.dealer_number.trim() : cleanWallet,
+        }),
         ...(updates.phone !== undefined && { phone: updates.phone ? updates.phone.trim() : null }),
         ...(updates.notes !== undefined && { notes: updates.notes ? updates.notes.trim() : null }),
       })

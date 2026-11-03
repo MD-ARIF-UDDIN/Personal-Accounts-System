@@ -11,13 +11,15 @@ export interface AppUser {
 export interface Dealer {
   id: string;
   user_id?: string;
-  name: string;
-  dealer_number: string;
   wallet_number: string;
-  phone?: string;
   notes?: string;
+  name?: string;
+  dealer_number?: string;
+  phone?: string;
   created_at?: string;
 }
+
+export type Wallet = Dealer;
 
 export interface Transaction {
   id: string;
