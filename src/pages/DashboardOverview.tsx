@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Wallet as WalletIcon, 
-  CalendarDays, 
+import {
+  Wallet as WalletIcon,
+  CalendarDays,
   Percent,
-  Plus, 
+  Plus,
   Search,
   Download,
   ChevronRight
@@ -80,15 +80,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       const monthlyTxList = dTx.filter((t) => t.date && t.date.slice(0, 7) === selectedMonth);
       const monthlyTx = monthlyTxList.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-      // Commission amounts based on percentage
+      // Both Daily and Monthly Commissions
       const todayCommission = (todayTx * commissionRateNum) / 100;
       const monthlyCommission = (monthlyTx * commissionRateNum) / 100;
 
       return {
         dealer,
         todayTx,
-        monthlyTx,
         todayCommission,
+        monthlyTx,
         monthlyCommission,
         todayCount: todayTxList.length,
         monthlyCount: monthlyTxList.length,
@@ -112,14 +112,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     return filteredData.reduce(
       (acc, row) => {
         acc.todayTx += row.todayTx;
-        acc.monthlyTx += row.monthlyTx;
         acc.todayCommission += row.todayCommission;
+        acc.monthlyTx += row.monthlyTx;
         acc.monthlyCommission += row.monthlyCommission;
         acc.todayCount += row.todayCount;
         acc.monthlyCount += row.monthlyCount;
         return acc;
       },
-      { todayTx: 0, monthlyTx: 0, todayCommission: 0, monthlyCommission: 0, todayCount: 0, monthlyCount: 0 }
+      { todayTx: 0, todayCommission: 0, monthlyTx: 0, monthlyCommission: 0, todayCount: 0, monthlyCount: 0 }
     );
   }, [filteredData]);
 
@@ -128,17 +128,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       walletNumber: row.dealer.wallet_number || row.dealer.dealer_number || '',
       note: row.dealer.notes || '',
       todayTx: row.todayTx,
+      todayCommission: row.todayCommission,
       monthlyTx: row.monthlyTx,
-      commission: row.monthlyCommission,
+      monthlyCommission: row.monthlyCommission,
     }));
 
     exportWalletReportToPDF({
       rows,
       totals: {
         todayTx: totals.todayTx,
+        todayCommission: totals.todayCommission,
         monthlyTx: totals.monthlyTx,
+        monthlyCommission: totals.monthlyCommission,
         walletCount: filteredData.length,
-        commission: totals.monthlyCommission,
       },
       selectedDate: todayStr,
       monthLabel: targetMonthLabel,
@@ -175,10 +177,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      {/* KPI Cards: Both Daily & Monthly Tx & Commissions */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         {/* Today Transactions */}
-        <div 
+        <div
           onClick={() => onNavigate('transactions')}
           className="bg-white p-3.5 rounded-2xl border-2 border-sky-100 shadow-xs cursor-pointer hover:border-sky-200 transition"
         >
@@ -188,13 +190,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {totals.todayCount}
             </span>
           </div>
-          <div className="text-base sm:text-2xl font-black text-slate-900 font-mono truncate">
+          <div className="text-base sm:text-xl font-black text-slate-900 font-mono truncate">
             {formatCurrency(totals.todayTx)}
           </div>
         </div>
 
-        {/* Monthly Transactions */}
+        {/* Today Commission */}
         <div 
+          onClick={() => onNavigate('reports')}
+          className="bg-white p-3.5 rounded-2xl border-2 border-amber-200 shadow-xs cursor-pointer hover:border-amber-300 transition"
+        >
+          <div className="flex items-center justify-between text-amber-800 mb-1">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider">Today Comm</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-mono">
+              {commissionRateNum}%
+            </span>
+          </div>
+          <div className="text-base sm:text-xl font-black text-amber-700 font-mono truncate">
+            {formatCurrency(totals.todayCommission)}
+          </div>
+        </div>
+
+        {/* Monthly Transactions */}
+        <div
           onClick={() => onNavigate('reports')}
           className="bg-white p-3.5 rounded-2xl border-2 border-indigo-100 shadow-xs cursor-pointer hover:border-indigo-200 transition"
         >
@@ -204,42 +222,37 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {targetMonthLabel}
             </span>
           </div>
-          <div className="text-base sm:text-2xl font-black text-slate-900 font-mono truncate">
+          <div className="text-base sm:text-xl font-black text-slate-900 font-mono truncate">
             {formatCurrency(totals.monthlyTx)}
           </div>
         </div>
 
-        {/* Commission */}
-        <div 
+        {/* Monthly Commission */}
+        <div
           onClick={() => onNavigate('reports')}
-          className="bg-white p-3.5 rounded-2xl border-2 border-amber-200 shadow-xs cursor-pointer hover:border-amber-300 transition"
+          className="bg-white p-3.5 rounded-2xl border-2 border-amber-300 shadow-xs cursor-pointer hover:border-amber-400 transition"
         >
-          <div className="flex items-center justify-between text-amber-800 mb-1">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider">Commission</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-mono">
+          <div className="flex items-center justify-between text-amber-900 mb-1">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider">Monthly Comm</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-mono">
               {commissionRateNum}%
             </span>
           </div>
-          <div className="text-base sm:text-2xl font-black text-amber-900 font-mono truncate">
+          <div className="text-base sm:text-xl font-black text-amber-900 font-mono truncate">
             {formatCurrency(totals.monthlyCommission)}
           </div>
-          {totals.todayCommission > 0 && (
-            <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-              Today: {formatCurrency(totals.todayCommission)}
-            </div>
-          )}
         </div>
 
         {/* Total Wallets */}
         <div
           onClick={() => onNavigate('dealers')}
-          className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-xs cursor-pointer hover:border-slate-300 transition flex flex-col justify-between"
+          className="col-span-2 sm:col-span-1 lg:col-span-1 bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-xs cursor-pointer hover:border-slate-300 transition flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[11px] font-extrabold uppercase tracking-wider">Wallets</span>
             <WalletIcon className="w-4 h-4 text-slate-500" />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">
+          <div className="text-lg sm:text-xl font-black text-slate-900">
             {dealers.length}
           </div>
         </div>
@@ -254,7 +267,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Wallet Report
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Today & Monthly Transaction & Commission Summary per Wallet
+              Daily & Monthly Transaction & Commission Summary per Wallet
             </p>
           </div>
 
@@ -347,61 +360,60 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Desktop Table View */}
+        {/* Desktop Table View - Both Daily & Monthly Commissions */}
         <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
-                <th className="py-2.5 px-3.5 w-10 text-center text-slate-400">#</th>
-                <th className="py-2.5 px-3.5">Wallet</th>
-                <th className="py-2.5 px-3.5">Note</th>
-                <th className="py-2.5 px-3.5 text-right">Today Transaction</th>
-                <th className="py-2.5 px-3.5 text-right">Monthly Transaction ({targetMonthLabel})</th>
-                <th className="py-2.5 px-3.5 text-right text-amber-800">Commission ({commissionRateNum}%)</th>
+                <th className="py-2.5 px-3 w-10 text-center text-slate-400">#</th>
+                <th className="py-2.5 px-3">Wallet</th>
+                <th className="py-2.5 px-2 text-[10px] text-slate-400 w-20">Note</th>
+                <th className="py-2.5 px-3 text-right">Today Tx</th>
+                <th className="py-2.5 px-3 text-right text-amber-700">Today Comm ({commissionRateNum}%)</th>
+                <th className="py-2.5 px-3 text-right">Monthly Tx ({targetMonthLabel})</th>
+                <th className="py-2.5 px-3 text-right text-amber-900">Monthly Comm ({commissionRateNum}%)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                  <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                     No wallets found.
                   </td>
                 </tr>
               ) : (
                 filteredData.map((row, idx) => (
                   <tr key={row.dealer.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                    <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
                       {idx + 1}
                     </td>
-                    <td className="py-2.5 px-3.5 font-mono font-extrabold text-slate-900">
+                    <td className="py-2.5 px-3 font-mono font-extrabold text-slate-900">
                       {row.dealer.wallet_number || row.dealer.dealer_number || 'Wallet'}
                     </td>
-                    <td className="py-2.5 px-3.5 text-slate-500 italic max-w-xs truncate">
+                    <td className="py-2.5 px-2 text-[10px] text-slate-400 italic max-w-[85px] truncate">
                       {row.dealer.notes || '—'}
                     </td>
-                    <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-sky-700">
+                    <td className="py-2.5 px-3 text-right font-mono font-extrabold text-sky-700">
                       {formatCurrency(row.todayTx)}
                       {row.todayCount > 0 && (
-                        <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
+                        <span className="text-[10px] text-slate-400 ml-1 font-normal">
                           ({row.todayCount})
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-slate-900">
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-700">
+                      {formatCurrency(row.todayCommission)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-extrabold text-slate-900">
                       {formatCurrency(row.monthlyTx)}
                       {row.monthlyCount > 0 && (
-                        <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
+                        <span className="text-[10px] text-slate-400 ml-1 font-normal">
                           ({row.monthlyCount})
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-amber-800">
-                      <div>{formatCurrency(row.monthlyCommission)}</div>
-                      {row.todayCommission > 0 && (
-                        <div className="text-[10px] text-slate-400 font-normal">
-                          Today: {formatCurrency(row.todayCommission)}
-                        </div>
-                      )}
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-amber-900">
+                      {formatCurrency(row.monthlyCommission)}
                     </td>
                   </tr>
                 ))
@@ -410,22 +422,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             {filteredData.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-100/80 border-t-2 border-slate-200 text-xs font-black text-slate-900">
-                  <td colSpan={3} className="py-3 px-3.5 uppercase tracking-wider text-slate-700">
+                  <td colSpan={3} className="py-3 px-3 uppercase tracking-wider text-slate-700">
                     Total ({filteredData.length} Wallets)
                   </td>
-                  <td className="py-3 px-3.5 text-right font-mono text-sm text-sky-700">
+                  <td className="py-3 px-3 text-right font-mono text-sm text-sky-700">
                     {formatCurrency(totals.todayTx)}
                   </td>
-                  <td className="py-3 px-3.5 text-right font-mono text-sm text-slate-900">
+                  <td className="py-3 px-3 text-right font-mono text-sm text-amber-700">
+                    {formatCurrency(totals.todayCommission)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-sm text-slate-900">
                     {formatCurrency(totals.monthlyTx)}
                   </td>
-                  <td className="py-3 px-3.5 text-right font-mono text-sm text-amber-800">
-                    <div>{formatCurrency(totals.monthlyCommission)}</div>
-                    {totals.todayCommission > 0 && (
-                      <div className="text-[10px] text-slate-500 font-normal">
-                        Today: {formatCurrency(totals.todayCommission)}
-                      </div>
-                    )}
+                  <td className="py-3 px-3 text-right font-mono text-sm text-amber-900">
+                    {formatCurrency(totals.monthlyCommission)}
                   </td>
                 </tr>
               </tfoot>
@@ -433,7 +443,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </table>
         </div>
 
-        {/* Mobile Cards View */}
+        {/* Mobile Cards View - Both Daily & Monthly Commissions */}
         <div className="sm:hidden space-y-2">
           {filteredData.length === 0 ? (
             <div className="bg-slate-50 rounded-2xl p-6 text-center text-slate-400 text-xs">
@@ -450,12 +460,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     {row.dealer.wallet_number || row.dealer.dealer_number || 'Wallet'}
                   </span>
                   {row.dealer.notes && (
-                    <p className="text-[11px] text-slate-500 italic mt-0.5">
+                    <span className="text-[10px] text-slate-400 italic block mt-0.5">
                       Note: {row.dealer.notes}
-                    </p>
+                    </span>
                   )}
                 </div>
 
+                {/* 2x2 Grid for Mobile */}
                 <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200/60">
                   <div className="bg-white rounded-xl p-2 border border-sky-100">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 block">
@@ -469,6 +480,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         {row.todayCount} tx
                       </span>
                     )}
+                  </div>
+
+                  <div className="bg-amber-50/70 rounded-xl p-2 border border-amber-200/70">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                      Today Comm ({commissionRateNum}%)
+                    </span>
+                    <span className="font-mono font-black text-sm text-amber-800">
+                      {formatCurrency(row.todayCommission)}
+                    </span>
                   </div>
 
                   <div className="bg-white rounded-xl p-2 border border-slate-200">
@@ -485,19 +505,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     )}
                   </div>
 
-                  {/* Mobile Commission Box */}
-                  <div className="bg-amber-50/80 rounded-xl p-2 border border-amber-200 col-span-2 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
-                        Commission ({commissionRateNum}%)
-                      </span>
-                      {row.todayCommission > 0 && (
-                        <span className="text-[10px] text-slate-500 block">
-                          Today: {formatCurrency(row.todayCommission)}
-                        </span>
-                      )}
-                    </div>
-                    <span className="font-mono font-black text-sm text-amber-900">
+                  <div className="bg-amber-100/70 rounded-xl p-2 border border-amber-300/80">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-900 block">
+                      Monthly Comm ({commissionRateNum}%)
+                    </span>
+                    <span className="font-mono font-black text-sm text-amber-950">
                       {formatCurrency(row.monthlyCommission)}
                     </span>
                   </div>
@@ -506,34 +518,42 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             ))
           )}
 
-          {/* Mobile Grand Total */}
+          {/* Mobile Grand Total Box */}
           {filteredData.length > 0 && (
-            <div className="bg-slate-900 text-white rounded-2xl p-3.5 shadow-md space-y-1.5 mt-3">
+            <div className="bg-slate-900 text-white rounded-2xl p-3.5 shadow-md space-y-2 mt-3">
               <div className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider">
                 <span>Total ({filteredData.length} Wallets)</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 font-mono text-center sm:text-left">
-                <div>
-                  <span className="text-[9px] text-sky-300 uppercase block font-semibold truncate">
-                    Today Tx
+              <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-800 font-mono">
+                <div className="bg-slate-800/80 rounded-xl p-2">
+                  <span className="text-[9px] text-sky-300 uppercase block font-semibold">
+                    Today Tx Total
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-white">
                     {formatCurrency(totals.todayTx)}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[9px] text-slate-400 uppercase block font-semibold truncate">
-                    Monthly Tx
+                <div className="bg-slate-800/80 rounded-xl p-2">
+                  <span className="text-[9px] text-amber-300 uppercase block font-semibold">
+                    Today Comm Total
+                  </span>
+                  <span className="text-xs sm:text-sm font-extrabold text-amber-300">
+                    {formatCurrency(totals.todayCommission)}
+                  </span>
+                </div>
+                <div className="bg-slate-800/80 rounded-xl p-2">
+                  <span className="text-[9px] text-slate-400 uppercase block font-semibold">
+                    Monthly Tx Total
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-white">
                     {formatCurrency(totals.monthlyTx)}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[9px] text-amber-300 uppercase block font-semibold truncate">
-                    Comm ({commissionRateNum}%)
+                <div className="bg-slate-800/80 rounded-xl p-2">
+                  <span className="text-[9px] text-amber-400 uppercase block font-semibold">
+                    Monthly Comm Total
                   </span>
-                  <span className="text-xs sm:text-sm font-extrabold text-amber-300">
+                  <span className="text-xs sm:text-sm font-extrabold text-amber-400">
                     {formatCurrency(totals.monthlyCommission)}
                   </span>
                 </div>
