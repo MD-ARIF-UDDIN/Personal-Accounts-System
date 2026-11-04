@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Wallet as WalletIcon, 
   CalendarDays, 
+  Percent,
   Plus, 
   Search,
   Download,
@@ -49,9 +50,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const currentMonthStr = getCurrentMonthStr();
 
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  const [commissionRate, setCommissionRate] = useState<string>('1.2');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const isViewingCurrentMonth = selectedMonth === currentMonthStr;
+  const commissionRateNum = parseFloat(commissionRate) || 0;
 
   // Month label (e.g. "Nov 2026")
   const targetMonthLabel = useMemo(() => {
@@ -77,15 +80,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       const monthlyTxList = dTx.filter((t) => t.date && t.date.slice(0, 7) === selectedMonth);
       const monthlyTx = monthlyTxList.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+      // Commission amounts based on percentage
+      const todayCommission = (todayTx * commissionRateNum) / 100;
+      const monthlyCommission = (monthlyTx * commissionRateNum) / 100;
+
       return {
         dealer,
         todayTx,
         monthlyTx,
+        todayCommission,
+        monthlyCommission,
         todayCount: todayTxList.length,
         monthlyCount: monthlyTxList.length,
       };
     });
-  }, [dealers, transactions, todayStr, selectedMonth]);
+  }, [dealers, transactions, todayStr, selectedMonth, commissionRateNum]);
 
   // Filtered by search
   const filteredData = useMemo(() => {
@@ -104,11 +113,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       (acc, row) => {
         acc.todayTx += row.todayTx;
         acc.monthlyTx += row.monthlyTx;
+        acc.todayCommission += row.todayCommission;
+        acc.monthlyCommission += row.monthlyCommission;
         acc.todayCount += row.todayCount;
         acc.monthlyCount += row.monthlyCount;
         return acc;
       },
-      { todayTx: 0, monthlyTx: 0, todayCount: 0, monthlyCount: 0 }
+      { todayTx: 0, monthlyTx: 0, todayCommission: 0, monthlyCommission: 0, todayCount: 0, monthlyCount: 0 }
     );
   }, [filteredData]);
 
@@ -118,6 +129,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       note: row.dealer.notes || '',
       todayTx: row.todayTx,
       monthlyTx: row.monthlyTx,
+      commission: row.monthlyCommission,
     }));
 
     exportWalletReportToPDF({
@@ -126,9 +138,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         todayTx: totals.todayTx,
         monthlyTx: totals.monthlyTx,
         walletCount: filteredData.length,
+        commission: totals.monthlyCommission,
       },
       selectedDate: todayStr,
       monthLabel: targetMonthLabel,
+      commissionRate: commissionRateNum,
     });
   };
 
@@ -162,7 +176,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {/* Today Transactions */}
         <div 
           onClick={() => onNavigate('transactions')}
@@ -195,10 +209,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
+        {/* Commission */}
+        <div 
+          onClick={() => onNavigate('reports')}
+          className="bg-white p-3.5 rounded-2xl border-2 border-amber-200 shadow-xs cursor-pointer hover:border-amber-300 transition"
+        >
+          <div className="flex items-center justify-between text-amber-800 mb-1">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider">Commission</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-mono">
+              {commissionRateNum}%
+            </span>
+          </div>
+          <div className="text-base sm:text-2xl font-black text-amber-900 font-mono truncate">
+            {formatCurrency(totals.monthlyCommission)}
+          </div>
+          {totals.todayCommission > 0 && (
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+              Today: {formatCurrency(totals.todayCommission)}
+            </div>
+          )}
+        </div>
+
         {/* Total Wallets */}
         <div
           onClick={() => onNavigate('dealers')}
-          className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-xs cursor-pointer hover:border-slate-300 transition"
+          className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-xs cursor-pointer hover:border-slate-300 transition flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[11px] font-extrabold uppercase tracking-wider">Wallets</span>
@@ -219,7 +254,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Wallet Report
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Today & Monthly Transaction Summary per Wallet
+              Today & Monthly Transaction & Commission Summary per Wallet
             </p>
           </div>
 
@@ -243,8 +278,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Toolbar: Search & Month Selector */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        {/* Toolbar: Search, Month Selector, and Commission Input */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
           {/* Search */}
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -257,26 +292,58 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             />
           </div>
 
-          {/* Month Selector */}
-          <div className="flex items-center gap-1.5 bg-indigo-50/70 px-2.5 py-1 border border-indigo-200/80 rounded-xl self-start sm:self-auto">
-            <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Month:</span>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value || currentMonthStr)}
-              className="text-xs font-mono font-bold text-indigo-950 bg-transparent focus:outline-none cursor-pointer"
-            />
-            {!isViewingCurrentMonth && (
-              <button
-                type="button"
-                onClick={() => setSelectedMonth(currentMonthStr)}
-                className="text-[10px] font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-1.5 py-0.5 rounded transition"
-                title="Reset to current month"
-              >
-                Current
-              </button>
-            )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Month Selector */}
+            <div className="flex items-center gap-1.5 bg-indigo-50/70 px-2.5 py-1 border border-indigo-200/80 rounded-xl">
+              <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Month:</span>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value || currentMonthStr)}
+                className="text-xs font-mono font-bold text-indigo-950 bg-transparent focus:outline-none cursor-pointer"
+              />
+              {!isViewingCurrentMonth && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth(currentMonthStr)}
+                  className="text-[10px] font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-1.5 py-0.5 rounded transition"
+                  title="Reset to current month"
+                >
+                  Current
+                </button>
+              )}
+            </div>
+
+            {/* Commission Input Field */}
+            <div className="flex items-center gap-1.5 bg-amber-50/80 px-2.5 py-1 border border-amber-300 rounded-xl">
+              <Percent className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <label className="text-[10px] font-bold text-amber-800 uppercase tracking-wider whitespace-nowrap">
+                Commission:
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="1.2"
+                  value={commissionRate}
+                  onChange={(e) => setCommissionRate(e.target.value)}
+                  className="w-14 text-xs font-mono font-bold text-amber-950 bg-transparent focus:outline-none text-right pr-0.5"
+                />
+                <span className="text-xs font-bold text-amber-800 font-mono">%</span>
+              </div>
+              {commissionRate !== '1.2' && (
+                <button
+                  type="button"
+                  onClick={() => setCommissionRate('1.2')}
+                  className="text-[10px] font-bold text-amber-800 bg-amber-200 hover:bg-amber-300 px-1.5 py-0.5 rounded transition ml-0.5"
+                  title="Reset to default 1.2%"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -290,12 +357,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <th className="py-2.5 px-3.5">Note</th>
                 <th className="py-2.5 px-3.5 text-right">Today Transaction</th>
                 <th className="py-2.5 px-3.5 text-right">Monthly Transaction ({targetMonthLabel})</th>
+                <th className="py-2.5 px-3.5 text-right text-amber-800">Commission ({commissionRateNum}%)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
                     No wallets found.
                   </td>
                 </tr>
@@ -327,6 +395,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         </span>
                       )}
                     </td>
+                    <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-amber-800">
+                      <div>{formatCurrency(row.monthlyCommission)}</div>
+                      {row.todayCommission > 0 && (
+                        <div className="text-[10px] text-slate-400 font-normal">
+                          Today: {formatCurrency(row.todayCommission)}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -342,6 +418,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   </td>
                   <td className="py-3 px-3.5 text-right font-mono text-sm text-slate-900">
                     {formatCurrency(totals.monthlyTx)}
+                  </td>
+                  <td className="py-3 px-3.5 text-right font-mono text-sm text-amber-800">
+                    <div>{formatCurrency(totals.monthlyCommission)}</div>
+                    {totals.todayCommission > 0 && (
+                      <div className="text-[10px] text-slate-500 font-normal">
+                        Today: {formatCurrency(totals.todayCommission)}
+                      </div>
+                    )}
                   </td>
                 </tr>
               </tfoot>
@@ -400,6 +484,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/* Mobile Commission Box */}
+                  <div className="bg-amber-50/80 rounded-xl p-2 border border-amber-200 col-span-2 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                        Commission ({commissionRateNum}%)
+                      </span>
+                      {row.todayCommission > 0 && (
+                        <span className="text-[10px] text-slate-500 block">
+                          Today: {formatCurrency(row.todayCommission)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono font-black text-sm text-amber-900">
+                      {formatCurrency(row.monthlyCommission)}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))
@@ -411,21 +512,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider">
                 <span>Total ({filteredData.length} Wallets)</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 font-mono">
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 font-mono text-center sm:text-left">
                 <div>
-                  <span className="text-[10px] text-sky-300 uppercase block font-semibold">
-                    Today Total
+                  <span className="text-[9px] text-sky-300 uppercase block font-semibold truncate">
+                    Today Tx
                   </span>
-                  <span className="text-sm font-extrabold text-white">
+                  <span className="text-xs sm:text-sm font-extrabold text-white">
                     {formatCurrency(totals.todayTx)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase block font-semibold">
-                    Monthly Total
+                  <span className="text-[9px] text-slate-400 uppercase block font-semibold truncate">
+                    Monthly Tx
                   </span>
-                  <span className="text-sm font-extrabold text-white">
+                  <span className="text-xs sm:text-sm font-extrabold text-white">
                     {formatCurrency(totals.monthlyTx)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-amber-300 uppercase block font-semibold truncate">
+                    Comm ({commissionRateNum}%)
+                  </span>
+                  <span className="text-xs sm:text-sm font-extrabold text-amber-300">
+                    {formatCurrency(totals.monthlyCommission)}
                   </span>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import {
   Wallet as WalletIcon, 
   Calendar, 
   CalendarDays,
+  Percent,
   Download, 
   Printer, 
   Search,
@@ -46,10 +47,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  const [commissionRate, setCommissionRate] = useState<string>('1.2');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const isViewingToday = selectedDate === todayStr;
   const isViewingCurrentMonth = selectedMonth === currentMonthStr;
+
+  const commissionRateNum = parseFloat(commissionRate) || 0;
 
   // Month label (e.g. "Nov 2026")
   const targetMonthLabel = useMemo(() => {
@@ -75,15 +79,21 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       const monthlyTxList = dTx.filter((t) => t.date && t.date.slice(0, 7) === selectedMonth);
       const monthlyTx = monthlyTxList.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+      // Calculated Commissions based on percentage input
+      const todayCommission = (todayTx * commissionRateNum) / 100;
+      const monthlyCommission = (monthlyTx * commissionRateNum) / 100;
+
       return {
         dealer,
         todayTx,
         monthlyTx,
+        todayCommission,
+        monthlyCommission,
         todayCount: todayTxList.length,
         monthlyCount: monthlyTxList.length,
       };
     });
-  }, [dealers, transactions, selectedDate, selectedMonth]);
+  }, [dealers, transactions, selectedDate, selectedMonth, commissionRateNum]);
 
   // Filtered by search term
   const filteredData = useMemo(() => {
@@ -102,11 +112,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       (acc, row) => {
         acc.todayTx += row.todayTx;
         acc.monthlyTx += row.monthlyTx;
+        acc.todayCommission += row.todayCommission;
+        acc.monthlyCommission += row.monthlyCommission;
         acc.todayCount += row.todayCount;
         acc.monthlyCount += row.monthlyCount;
         return acc;
       },
-      { todayTx: 0, monthlyTx: 0, todayCount: 0, monthlyCount: 0 }
+      { todayTx: 0, monthlyTx: 0, todayCommission: 0, monthlyCommission: 0, todayCount: 0, monthlyCount: 0 }
     );
   }, [filteredData]);
 
@@ -116,6 +128,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       note: row.dealer.notes || '',
       todayTx: row.todayTx,
       monthlyTx: row.monthlyTx,
+      commission: row.monthlyCommission,
     }));
 
     exportWalletReportToPDF({
@@ -124,9 +137,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         todayTx: totals.todayTx,
         monthlyTx: totals.monthlyTx,
         walletCount: filteredData.length,
+        commission: totals.monthlyCommission,
       },
       selectedDate,
       monthLabel: targetMonthLabel,
+      commissionRate: commissionRateNum,
     });
   };
 
@@ -144,7 +159,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             Wallet Report
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Wallet-wise Today & Monthly Transaction Summary
+            Wallet-wise Today & Monthly Transaction & Commission Summary
           </p>
         </div>
 
@@ -171,12 +186,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {/* Today Transaction Card */}
         <div className="bg-white rounded-2xl border-2 border-sky-100 p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-700">
-              {isViewingToday ? 'Today Transaction' : `Tx (${selectedDate})`}
+              {isViewingToday ? 'Today Tx' : `Tx (${selectedDate})`}
             </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700">
               {totals.todayCount} tx
@@ -191,7 +206,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         <div className="bg-white rounded-2xl border-2 border-indigo-100 p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700">
-              Monthly Transaction
+              Monthly Tx
             </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
               {targetMonthLabel}
@@ -202,12 +217,32 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
           </div>
         </div>
 
+        {/* Commission Card */}
+        <div className="bg-white rounded-2xl border-2 border-amber-200 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800">
+              Commission
+            </span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-mono">
+              {commissionRateNum}%
+            </span>
+          </div>
+          <div className="mt-1 font-mono font-black text-lg sm:text-2xl text-amber-900">
+            {formatCurrency(totals.monthlyCommission)}
+          </div>
+          {totals.todayCommission > 0 && (
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+              Today: {formatCurrency(totals.todayCommission)}
+            </div>
+          )}
+        </div>
+
         {/* Total Wallets Card */}
-        <div className="col-span-2 sm:col-span-1 bg-white rounded-2xl border-2 border-slate-200 p-3.5 shadow-xs flex items-center justify-between sm:block">
+        <div className="bg-white rounded-2xl border-2 border-slate-200 p-3.5 shadow-xs flex flex-col justify-between">
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
             Total Wallets
           </span>
-          <div className="mt-0.5 sm:mt-1 font-mono font-black text-lg sm:text-2xl text-slate-800">
+          <div className="mt-1 font-mono font-black text-lg sm:text-2xl text-slate-800">
             {filteredData.length}
             {dealers.length !== filteredData.length && (
               <span className="text-xs font-normal text-slate-400 ml-1">
@@ -218,8 +253,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         </div>
       </div>
 
-      {/* Filter and Date / Month Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 print:hidden">
+      {/* Filter and Date / Month / Commission Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 print:hidden">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -232,7 +267,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
           />
         </div>
 
-        {/* Pickers for Day and Month */}
+        {/* Pickers for Day, Month, and Commission */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Day / Date Selector */}
           <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 border border-slate-200 rounded-xl">
@@ -277,6 +312,36 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
               </button>
             )}
           </div>
+
+          {/* Commission Input Field */}
+          <div className="flex items-center gap-1.5 bg-amber-50/80 px-2.5 py-1.5 border border-amber-300 rounded-xl">
+            <Percent className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <label className="text-[10px] font-bold text-amber-800 uppercase tracking-wider whitespace-nowrap">
+              Commission:
+            </label>
+            <div className="flex items-center">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="1.2"
+                value={commissionRate}
+                onChange={(e) => setCommissionRate(e.target.value)}
+                className="w-14 text-xs font-mono font-bold text-amber-950 bg-transparent focus:outline-none text-right pr-0.5"
+              />
+              <span className="text-xs font-bold text-amber-800 font-mono">%</span>
+            </div>
+            {commissionRate !== '1.2' && (
+              <button
+                type="button"
+                onClick={() => setCommissionRate('1.2')}
+                className="text-[10px] font-bold text-amber-800 bg-amber-200 hover:bg-amber-300 px-1.5 py-0.5 rounded transition ml-0.5"
+                title="Reset to default 1.2%"
+              >
+                Reset
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -285,33 +350,34 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
-              <th className="py-3 px-4 w-12 text-center text-slate-400">#</th>
-              <th className="py-3 px-4">Wallet</th>
-              <th className="py-3 px-4">Note</th>
-              <th className="py-3 px-4 text-right">Today Transaction</th>
-              <th className="py-3 px-4 text-right">Monthly Transaction ({targetMonthLabel})</th>
+              <th className="py-3 px-3.5 w-10 text-center text-slate-400">#</th>
+              <th className="py-3 px-3.5">Wallet</th>
+              <th className="py-3 px-3.5">Note</th>
+              <th className="py-3 px-3.5 text-right">Today Transaction</th>
+              <th className="py-3 px-3.5 text-right">Monthly Transaction ({targetMonthLabel})</th>
+              <th className="py-3 px-3.5 text-right text-amber-800">Commission ({commissionRateNum}%)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {filteredData.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400 font-medium">
+                <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
                   No wallets found.
                 </td>
               </tr>
             ) : (
               filteredData.map((row, idx) => (
                 <tr key={row.dealer.id} className="hover:bg-slate-50/70 transition">
-                  <td className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
+                  <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
                     {idx + 1}
                   </td>
-                  <td className="py-3 px-4 font-mono font-extrabold text-slate-900">
+                  <td className="py-3 px-3.5 font-mono font-extrabold text-slate-900">
                     {row.dealer.wallet_number || row.dealer.dealer_number || 'Wallet'}
                   </td>
-                  <td className="py-3 px-4 text-slate-500 italic max-w-xs truncate">
+                  <td className="py-3 px-3.5 text-slate-500 italic max-w-xs truncate">
                     {row.dealer.notes || '—'}
                   </td>
-                  <td className="py-3 px-4 text-right font-mono font-extrabold text-sky-700">
+                  <td className="py-3 px-3.5 text-right font-mono font-extrabold text-sky-700">
                     {formatCurrency(row.todayTx)}
                     {row.todayCount > 0 && (
                       <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
@@ -319,12 +385,20 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                       </span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-right font-mono font-extrabold text-slate-900">
+                  <td className="py-3 px-3.5 text-right font-mono font-extrabold text-slate-900">
                     {formatCurrency(row.monthlyTx)}
                     {row.monthlyCount > 0 && (
                       <span className="text-[10px] text-slate-400 ml-1.5 font-normal">
                         ({row.monthlyCount})
                       </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3.5 text-right font-mono font-extrabold text-amber-800">
+                    <div>{formatCurrency(row.monthlyCommission)}</div>
+                    {row.todayCommission > 0 && (
+                      <div className="text-[10px] text-slate-400 font-normal">
+                        Today: {formatCurrency(row.todayCommission)}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -334,14 +408,22 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
           {filteredData.length > 0 && (
             <tfoot>
               <tr className="bg-slate-100/80 border-t-2 border-slate-200 text-xs font-black text-slate-900">
-                <td colSpan={3} className="py-3.5 px-4 uppercase tracking-wider text-slate-700">
+                <td colSpan={3} className="py-3.5 px-3.5 uppercase tracking-wider text-slate-700">
                   Total ({filteredData.length} Wallets)
                 </td>
-                <td className="py-3.5 px-4 text-right font-mono text-sm text-sky-700">
+                <td className="py-3.5 px-3.5 text-right font-mono text-sm text-sky-700">
                   {formatCurrency(totals.todayTx)}
                 </td>
-                <td className="py-3.5 px-4 text-right font-mono text-sm text-slate-900">
+                <td className="py-3.5 px-3.5 text-right font-mono text-sm text-slate-900">
                   {formatCurrency(totals.monthlyTx)}
+                </td>
+                <td className="py-3.5 px-3.5 text-right font-mono text-sm text-amber-800">
+                  <div>{formatCurrency(totals.monthlyCommission)}</div>
+                  {totals.todayCommission > 0 && (
+                    <div className="text-[10px] text-slate-500 font-normal">
+                      Today: {formatCurrency(totals.todayCommission)}
+                    </div>
+                  )}
                 </td>
               </tr>
             </tfoot>
@@ -402,6 +484,23 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                     </span>
                   )}
                 </div>
+
+                {/* Mobile Commission Box */}
+                <div className="bg-amber-50/80 rounded-xl p-2 border border-amber-200 col-span-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                      Commission ({commissionRateNum}%)
+                    </span>
+                    {row.todayCommission > 0 && (
+                      <span className="text-[10px] text-slate-500 block">
+                        Today: {formatCurrency(row.todayCommission)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-mono font-black text-sm text-amber-900">
+                    {formatCurrency(row.monthlyCommission)}
+                  </span>
+                </div>
               </div>
             </div>
           ))
@@ -414,21 +513,29 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
               <span>Grand Total</span>
               <span>{filteredData.length} Wallets</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-800 font-mono">
+            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 font-mono text-center sm:text-left">
               <div>
-                <span className="text-[10px] text-sky-300 uppercase block font-semibold">
-                  Today Total
+                <span className="text-[9px] text-sky-300 uppercase block font-semibold truncate">
+                  Today Tx
                 </span>
-                <span className="text-base font-extrabold text-white">
+                <span className="text-xs sm:text-sm font-extrabold text-white">
                   {formatCurrency(totals.todayTx)}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase block font-semibold">
-                  Monthly Total
+                <span className="text-[9px] text-slate-400 uppercase block font-semibold truncate">
+                  Monthly Tx
                 </span>
-                <span className="text-base font-extrabold text-white">
+                <span className="text-xs sm:text-sm font-extrabold text-white">
                   {formatCurrency(totals.monthlyTx)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] text-amber-300 uppercase block font-semibold truncate">
+                  Comm ({commissionRateNum}%)
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-amber-300">
+                  {formatCurrency(totals.monthlyCommission)}
                 </span>
               </div>
             </div>
